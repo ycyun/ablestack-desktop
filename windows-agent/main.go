@@ -119,7 +119,7 @@ func main() {
 	time.Sleep(10*time.Second)
 	interval := Agentconfig.Interval
 
-
+	checkStatus()
 	//logincheckfnc2()
 	//return
 	c1 := make(chan string, 1)
@@ -410,63 +410,6 @@ func healthCheck(c1 chan string, interval int) {
 }
 
 
-type AGENTCONFIG struct {
-	WorksServer string `json:"WorksServer"`
-	WorksPort   int    `json:"WorksPort"`
-	Type        string `json:"Type"`
-	UUID        string `json:"UUID"`
-	Silent      bool   `json:"Silent"`
-	Interval    int    `json:"Interval"`
-	Status      string `json:"Status"`
-	HostName    string `json:"HostName"`
-	Domain    string `json:"Domain"`
-}
-var Agentconfig = AGENTCONFIG{Silent: false, Interval: 10}
-
-func AgentInit() (err error) {
-	data, err := os.Open("conf.json")
-	if err != nil {
-		log.Fatalf("ADinit: %s", err)
-		return err
-	}
-
-	byteValue, err := ioutil.ReadAll(data)
-	if err != nil {
-		log.Fatalf("ADinit: %s", err)
-		return err
-	}
-
-	err = json.Unmarshal(byteValue, &Agentconfig)
-	if err != nil {
-		log.Fatalf("ADinit: %s", err)
-		return err
-	}
-	log.Infof("Agentconfig: %v", Agentconfig)
-	return nil
-
-}
-
-
-func AgentSave() (err error) {
-	data, err := os.OpenFile("conf.json", os.O_WRONLY, 0777)
-	if err != nil {
-		log.Fatalf("agentsave: %s", err)
-		return err
-	}
-	byteValue, err:=json.Marshal(Agentconfig)
-	if err != nil {
-		log.Fatalf("ADinit: %s", err)
-		return err
-	}
-	log.Errorf("Save %s", byteValue)
-	_, err = data.Write(byteValue)
-	if err != nil {
-		log.Fatalf("ADinit: %s", err)
-		return err
-	}
-	return nil
-
-}
 //user password change
 func httpReq(li []map[string]string, ips []string) error {
 	setLog()
@@ -491,17 +434,6 @@ func httpReq(li []map[string]string, ips []string) error {
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-	log.Infof("req: %v", req)
-	log.Infof("Body: %v", req.Body)
-	log.Infof("Header: %v", req.Header)
-	log.Infof("URL: %v", req.URL)
-	log.Infof("Form: %v", req.Form)
-	log.Infof("PostForm: %v", req.PostForm)
-	log.Infof("RequestURI: %v", req.RequestURI)
-	br, _ :=req.GetBody()
-	insert := make([]byte, 2048)
-	_, _ = br.Read(insert)
-	log.Infof("BodyRead: %v", string(insert))
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -548,147 +480,3 @@ func httpReq(li []map[string]string, ips []string) error {
 	return nil
 }
 
-
-func adjoinHandler(c *gin.Context) {
-	setLog()
-	domain := c.Param("domain")
-	domain = Agentconfig.Domain
-	shell, err := setupShell()
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	cmd := fmt.Sprintf("$username = \"$%v\\administrator\"; ", domain) +
-		"$password = \"Ablecloud1!\" | ConvertTo-SecureString -asPlainText -Force; " +
-		"$credential = New-Object System.Management.Automation.PSCredential($username,$password); " +
-		fmt.Sprintf("Add-Computer -DomainName %v -Credential $credential", domain)
-	log.Debugln(cmd)
-	output, err := shell.Exec(cmd)
-	log.Debugf("output: %v", output)
-	log.Debugf("error: %v", err)
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	cmd = "shutdown /r /t 10"
-	log.Debugln(cmd)
-	output, err = shell.Exec(cmd)
-	log.Debugf("output: %v", output)
-	log.Debugf("error: %v", err)
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	Agentconfig.Status = "Joining"
-	_=AgentSave()
-	c.JSON(http.StatusOK, output)
-	return
-}
-
-
-func bootstrapHandler(c *gin.Context) {
-	setLog()
-
-	//computername := c.Param("computername")
-	domain := c.PostForm("domain")
-	shell, err := setupShell()
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	service1 := fmt.Sprintf("c:\\agent\\nssm.exe set \"Ablecloud Works Agent\" objectName %v\\administrator Ablecloud1!", domain)
-	output1, err1 := shell.Exec(service1)
-	if err1 != nil {
-
-		log.Errorf("err1: %v", service1)
-		log.Errorf("err1: %v", err1)
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err1.Error(), Target: "getComputer"})
-		return
-	}
-	service2 := fmt.Sprintf("gpupdate /force")
-	output2, err2 := shell.Exec(service2)
-	if err2 != nil {
-		log.Errorf("err1: %v", service2)
-		log.Errorf("err2: %v", err2)
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err2.Error(), Target: "getComputer"})
-		return
-	}
-	c.JSON(http.StatusOK, map[string]string{"output1": output1, "output2":output2})
-	return
-}
-
-
-func adStatusHandler(c *gin.Context) {
-	setLog()
-	shell, err := setupShell()
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	output, err := shell.Exec("get-computerinfo -property csdomain | format-list")
-	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-		return
-	}
-	domain:=strings.TrimSpace(strings.Split(strings.TrimSpace(output), ":")[1])
-
-	if strings.EqualFold(domain, "WORKGROUP") && Agentconfig.Status!="Joining"{
-		Agentconfig.Status = "Pending"
-		_=AgentSave()
-		c.JSON(http.StatusOK,
-		map[string]string{
-			"status": Agentconfig.Status,
-			"next": "PUT <vdi>/ad/:domain/",
-		})
-		return
-	} else {
-		output, err := shell.Exec("get-computerinfo -property csname | format-list")
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-			return
-		}
-		comname:=strings.TrimSpace(strings.Split(strings.TrimSpace(output), ":")[1])
-		output, err = shell.Exec(fmt.Sprintf("gpresult /scope computer /r | select-string -pattern cn=%v", comname))
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-			return
-		}
-		if strings.Contains(strings.TrimSpace(output),  "OU=")		{
-			Agentconfig.Status = "Joined"
-			_=AgentSave()
-		}
-		output, err = shell.Exec("gpresult /scope computer /r | select-string -pattern remote")
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, errorModel{Msg: err.Error(), Target: "getComputer"})
-			return
-		}
-		if strings.Contains(strings.TrimSpace(output),  "remotefx")		{
-			Agentconfig.Status = "Ready"
-			_=AgentSave()
-		}
-		if Agentconfig.Status == "Joining" {
-			c.JSON(http.StatusOK,
-				map[string]string{
-					"status": Agentconfig.Status,
-					"next": "PUT <dc>/computer/:computername/:groupname",
-				})
-			return
-		} else if Agentconfig.Status == "Joined"{
-			c.JSON(http.StatusOK,
-				map[string]string{
-					"status": Agentconfig.Status,
-					"next": "GET <vdi>/cmd/?timeout=60&cmd=gpupdate /force",
-				})
-			return
-		} else if Agentconfig.Status == "Ready"{
-			c.JSON(http.StatusOK,
-				map[string]string{
-					"status": Agentconfig.Status,
-					"next": "Ready to use",
-				})
-			return
-		}
-	}
-	c.JSON(http.StatusOK, output)
-	return
-}

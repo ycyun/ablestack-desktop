@@ -1,0 +1,18 @@
+{
+  "ADbasedn": "DC=ycy,DC=local",
+  "ADdomain": "ycy.local",
+  "ADpassword": "Ablecloud1!",
+  "ADport": 636,
+  "ADserver": "ycy.local",
+  "ADusername": "Administrator",
+  "BootStraped": true,
+
+
+  "Domain": "ycy",
+  "HostName": "ycy-dc",
+  "PolicyLIST": "policylist.json",
+  "PolicyPATH": "./grouppolicy",
+  "Silent": false,
+  "Status": " renamehost adjoin serviceupdated",
+  "UpdatePolicy": true
+}

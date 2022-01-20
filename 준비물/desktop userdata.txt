@@ -1,0 +1,21 @@
+
+<powershell>
+date > "c:\agent\installed.txt"
+$dnsip = "10.1.1.160"
+echo $dnsip >> "c:\agent\installed.txt"
+set-DnsClientServerAddress -InterfaceIndex (Get-NetAdapter |Select-Object InterfaceAlias, interfaceindex).interfaceindex -ServerAddresses 10.1.1.160
+$password = "Ablecloud1!" | ConvertTo-SecureString -asPlainText -Force
+$username = "$ycy\administrator" 
+$credential = New-Object System.Management.Automation.PSCredential($username,$password)
+echo Rename-Computer >> "c:\agent\installed.txt"
+Rename-Computer -NewName ycytest-001
+echo Add-Computer >> "c:\agent\installed.txt"
+echo Add-Computer end>> "c:\agent\installed.txt"
+$conf = '{"WorksServer": "10.1.1.160", "WorksPort": 8082, "Type": "instance", "UUID": "3dee0753-f678-4f26-b7f3-449ec2c32abd","HostName": "ycytest-001","Domain": "ycy"}'
+echo $conf| Out-File -Encoding ascii "c:\agent\conf.json"
+echo $conf
+echo $conf >> "c:\agent\installed.txt"
+C:\agent\nssm.exe set "Ablecloud Works Agent" start SERVICE_DELAYED_AUTO_START
+C:\agent\nssm.exe restart "Ablecloud Works Agent"
+date >> "c:\agent\installed.txt"
+</powershell>

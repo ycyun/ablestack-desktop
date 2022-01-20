@@ -101,7 +101,7 @@ var GroupAttributes = []string{
 
 var authconfig = &auth.Config{}
 
-func ADsave() (err error) {
+func ADsave()  {
 
 	//ADconfig.ADusername = "Administrator"
 	//ADconfig.ADpassword = "Ablecloud1!"
@@ -116,15 +116,15 @@ func ADsave() (err error) {
 
 	byteValue, err := json.MarshalIndent(ADconfig, "", "  ")
 	if err != nil {
-		return err
+		return
 	}
 
 	err = ioutil.WriteFile("conf.json", byteValue, 0644)
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 func ADinit() (err error) {
